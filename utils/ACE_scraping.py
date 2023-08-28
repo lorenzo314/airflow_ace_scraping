@@ -1,11 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon May  9 16:40:34 2022
-
-@author: célineong
-"""
-
-
 import pathlib
 import pandas as pd
 import utils
@@ -15,6 +7,75 @@ import requests
 from datetime import datetime
 from urllib import request
 import re
+
+from airflow.decorators import task
+
+
+@task()
+def download_data(list_url, directory_path, start_date, monthly=False):
+    """
+    Download data files from all the urls into the saving directories.
+    Track download progress
+
+    Parameters
+    ----------
+    list_url : list
+        List of all the complete urls for each dates and each measuring devices.
+    directory_path : str
+        Path pointing to the directories where files are saved.
+    start_date : datetime.datetime
+        Left bound for generating scraping time interval. Used to build the file_name in automatic mode
+    monthly : bool, optional
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    Write .txt files and save them in the selected directories.
+
+    """
+    if list_url:
+        for url in tqdm(list_url):
+            check_url = utils.is_url(url)
+            if not check_url:
+                print(url + " doesn't exist")
+            else:
+                if ("daily" in directory_path) or ("monthly" in directory_path):
+                    # manual case
+                    file_name = url.split('/')[-1]
+                    device = file_name.split("_")[2]
+                else:
+                    # automatic case
+                    date_format = "%Y-%m-%d_%H-%M-%S"
+                    formatted_date = start_date.strftime(date_format)
+                    device = re.split(r'[\-.]+', url)[-2]
+                    file_name = formatted_date + "_donnees_" + device + ".txt"
+
+                # grab the file
+                request.urlretrieve(url, directory_path + "/" + device + "/" + file_name)
+
+# --------------------------------------------------------------------
+#
+# ORIGINAL CODE
+#
+# --------------------------------------------------------------------
+
+# -*- coding: utf-8 -*-
+"""
+Created on Mon May  9 16:40:34 2022
+
+@author: célineong
+"""
+
+
+# import pathlib
+# # import pandas as pd
+# import utils
+# import os
+# from tqdm.auto import tqdm
+# import requests
+# from datetime import datetime
+# from urllib import request
+# import re
 
 def check_passed_arguments(argv):
     """
@@ -37,7 +98,7 @@ def check_passed_arguments(argv):
 
     Returns
     -------
-    
+
     start_date : datetime.datetime
         Left bound for generating scraping time interval.
     end_date : datetime.datetime
@@ -50,13 +111,13 @@ def check_passed_arguments(argv):
         Used in manual manual mode to distinguish between download of monthly data and download of daily data.
 
     """
-      
+
     #  Pass command-line arguments to the script.
     arguments = argv[1:]
     if ((len(arguments) !=0) and (3 < len(arguments) < 6)):
         #(len(arguments) != 3) and (len(arguments) != 4) and (len(arguments) != 5) and (len(arguments) != 6)):
         raise ValueError("Wrong number of arguments passed, expected 0, or 2 dates and a save_path, or 2 dates a save_path and a list of SWE features, or 2 dates a save_path, a list of SWE features and a sampling frequency")
-               
+
     #No argument besides "main.py" is passed, default: download the daily file
     elif len(arguments) == 0:
         start_date = datetime.now()
@@ -64,20 +125,20 @@ def check_passed_arguments(argv):
         directory_path = pathlib.Path(__file__).parent.parent / 'data'
         source = "https://services.swpc.noaa.gov/text/" # address Arnaud
         monthly = None
-                  
+
     else:
         if str(pathlib.Path(__file__).parent.parent / 'data' / 'data_aggregating') in arguments[2]  or str(pathlib.Path(__file__).parent.parent / 'data' / 'data_scraping') in arguments[2]:
             raise ValueError("You cannot use default directory in manual mode, please select another directory")
         elif not os.path.isdir(arguments[2]):
-            raise ValueError("Path does not exist")    
-        else:        
+            raise ValueError("Path does not exist")
+        else:
             try:
                 start_date = datetime.strptime(arguments[0],"%Y-%m")
                 end_date = datetime.strptime(arguments[1],"%Y-%m")
                 source = "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/monthly/"
                 monthly = True
             except:
-                try: 
+                try:
                     start_date = datetime.strptime(arguments[0],"%Y-%m-%d_%H:%M:%S")
                     end_date = datetime.strptime(arguments[1],"%Y-%m-%d_%H:%M:%S")
                     source = "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/daily/"
@@ -97,7 +158,7 @@ def check_passed_arguments(argv):
 
 def create_directory(directory_path, measuring_devices, monthly=False):
     """
-    For automatic mode: creates data/ directory to save scraped data files from source and one directory 
+    For automatic mode: creates data/ directory to save scraped data files from source and one directory
     to save processed (aggregated) data for each measuring device
     For manual mode: in the passed directory, creates a monthly/ and a daily/ directories, creates subdirectories for each measuring device in these directories
 
@@ -124,34 +185,34 @@ def create_directory(directory_path, measuring_devices, monthly=False):
             nasa_device = device
         # automatic mode
         if directory_path == pathlib.Path(__file__).parent.parent / 'data':
-    
+
         # Create directory to scrape data
             data_scraping_directory = str(directory_path) + '/data_scraping/'
             #data_device = os.path.join(data_scraping_directory, device, "")
             data_device = os.path.join(data_scraping_directory, nasa_device, "")
             if not os.path.exists(data_device):
                 os.makedirs(data_device)
-                
-        # Create directory to process data 
+
+        # Create directory to process data
             data_aggregating_directory = str(directory_path) + '/data_aggregating/'
             data_device = os.path.join(data_aggregating_directory, nasa_device, "")
             if not os.path.exists(data_device):
                 os.makedirs(data_device)
-        
+
         # manual mode
         else:
             if monthly:
                 data_scraping_directory = str(directory_path) + '/monthly/'
             else:
                 data_scraping_directory = str(directory_path) + '/daily/'
-            
+
             data_device = os.path.join(data_scraping_directory, device, "")
             if not os.path.exists(data_device):
                 os.makedirs(data_device)
-    
+
     return data_scraping_directory
-    
-    
+
+
 def get_dates_in_time_interval(start_date, end_date, monthly):
     """
     Get the dates over the selected time interval. For manual mode, frequency is either month or day. For automatic mode, frequency is day. For automatic mode, the right time bound is equal to the left time bound.
@@ -173,11 +234,11 @@ def get_dates_in_time_interval(start_date, end_date, monthly):
     """
     if monthly==True:
         dates_in_time_interval= pd.date_range(start_date, end_date, freq = 'MS')
-    else: 
-        if end_date == None: 
+    else:
+        if end_date == None:
             end_date = start_date
         dates_in_time_interval= pd.date_range(start_date, end_date, freq = 'd')
-        
+
     return dates_in_time_interval
 
 def define_url_format(source, dates_in_time_interval, measuring_devices, directory_path):
@@ -204,7 +265,7 @@ def define_url_format(source, dates_in_time_interval, measuring_devices, directo
         List of all the complete urls for each dates and each measuring devices.
 
     """
-    
+
     list_url = []
     for device in measuring_devices:
         # Next 4 lines because on one url, the device is called "magnetometer", and on the other "mag"
@@ -212,17 +273,17 @@ def define_url_format(source, dates_in_time_interval, measuring_devices, directo
             nasa_device = "magnetometer"
         else:
             nasa_device = device
-              
+
         for date in dates_in_time_interval:
-            
-            # for automatic download 
+
+            # for automatic download
             if source == "https://services.swpc.noaa.gov/text/":
                 date_format ="%Y-%m-%d_%H-%M-%S"
                 formatted_date = date.strftime(date_format)
                 remote_file_name = "ace-" + nasa_device + ".txt"
                 url = source + remote_file_name
                 list_url.append(url)
-            
+
             # for manual download of monthly files
             elif source == "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/monthly/":
                 date_format ="%Y%m"
@@ -233,8 +294,8 @@ def define_url_format(source, dates_in_time_interval, measuring_devices, directo
                 if not os.path.isfile(directory_path + device + '/' + file_name):
                     url = source + file_name
                     list_url.append(url)
-           
-            # for manual download of daily files                   
+
+            # for manual download of daily files
             elif source == "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/daily/":
                 date_format = "%Y%m%d"
                 interval = get_interval(device)
@@ -244,11 +305,11 @@ def define_url_format(source, dates_in_time_interval, measuring_devices, directo
                 if not os.path.isfile(directory_path + device + '/' + file_name):
                     url = source + file_name
                     list_url.append(url)
-                   
-            else:
-                raise ValueError("Your local source does match any default sources, please check sources ")   
 
-    return  list_url      
+            else:
+                raise ValueError("Your local source does match any default sources, please check sources ")
+
+    return  list_url
 
 def download_data(list_url, directory_path, start_date, monthly=False):
     """
@@ -270,7 +331,7 @@ def download_data(list_url, directory_path, start_date, monthly=False):
     Write .txt files and save them in the selected directories.
 
     """
-    if list_url:            
+    if list_url:
         for url in tqdm(list_url):
             check_url = utils.is_url(url)
             if not check_url:
@@ -279,17 +340,17 @@ def download_data(list_url, directory_path, start_date, monthly=False):
                 if ("daily" in directory_path) or ("monthly" in directory_path):
                     # manual case
                     file_name = url.split('/')[-1]
-                    device = file_name.split("_")[2]  
+                    device = file_name.split("_")[2]
                 else:
                     # automatic case
                     date_format ="%Y-%m-%d_%H-%M-%S"
                     formatted_date = start_date.strftime(date_format)
                     device = re.split(r'[\-.]+', url)[-2]
                     file_name = formatted_date +"_donnees_"+ device + ".txt"
-                
+
                 # grab the file
                 request.urlretrieve(url, directory_path + "/" + device + "/" + file_name)
-        
+
 def get_interval(device):
     """
     Get the time interval of the measuring device

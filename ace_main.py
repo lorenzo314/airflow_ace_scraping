@@ -10,15 +10,12 @@ import ace_utils as au
     schedule=None,
     start_date=pendulum.datetime(2023, 8, 1, tz="UTC"),
     catchup=False,
-    tags=["ace_scraping"],
-    params={
-        "measuring_devices":
-            Param(['mag', 'swepam', 'epam', 'sis'], type="list")
-    }
+    tags=["ace_scraping"]
 )
 def pipeline_scrape_ace_data():
-    ps = [p for p in params["measuring_devices"]]
-    print(ps)
+    measuring_devices=['mag', 'swepam', 'epam', 'sis']
+    for p in measuring_devices:
+        print(p)
 
 
 pipeline_scrape_ace_data()
