@@ -1,14 +1,33 @@
 import pathlib
 import pandas as pd
-import utils
 import os
 from tqdm.auto import tqdm
-import requests
 from datetime import datetime
 from urllib import request
 import re
+import requests
 
 from airflow.decorators import task
+
+
+def is_url(url):
+    """
+    Check if the passed url exists or not
+
+    INPUT:
+    :param: url (str)      url to test
+
+    OUTPUT: True if the url exists, False if not
+    """
+    r = requests.get(url)
+    if r.status_code == 429:
+        print('Retry URL checking (429)')
+        time.sleep(5)
+        return is_url(url)
+    elif r.status_code == 404:
+        return False
+    else:
+        return True
 
 
 def check_passed_arguments(argv):
@@ -53,6 +72,9 @@ def check_passed_arguments(argv):
     #  Pass command-line arguments to the script.
     arguments = argv[1:]
 
+    print("ARGUMENTS", arguments)
+    print(len(arguments))
+
     if len(arguments) != 0 and 3 < len(arguments) < 6:
         raise ValueError(
             "Wrong number of arguments passed, expected 0, or 2 dates and a save_path,"
@@ -72,47 +94,50 @@ def check_passed_arguments(argv):
 
         monthly = None
     else:
-        aux = str(pathlib.Path(__file__).parent.parent / 'data')
-        if str(aux / 'data_aggregating') in arguments[2] \
-                or str(aux / 'data_scraping') in arguments[2]:
-            raise ValueError("You cannot use default directory in manual mode,"
-                             " please select another directory")
-        elif not os.path.isdir(arguments[2]):
-            raise ValueError("Path does not exist")
-        else:
-            try:
-                start_date = datetime.strptime(arguments[0], "%Y-%m")
-                end_date = datetime.strptime(arguments[1], "%Y-%m")
-                source = "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/monthly/"
-                monthly = True
-            except ValueError:
-                try:
-                    start_date = \
-                        datetime.strptime(arguments[0], "%Y-%m-%d_%H:%M:%S")
-                    end_date = \
-                        datetime.strptime(arguments[1], "%Y-%m-%d_%H:%M:%S")
-                    source = \
-                        "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/daily/"
-                    monthly = False
-                except ValueError:
-                    raise ValueError(
-                        "Could not parse date,"
-                        " expected format is : YYYY-MM-dd_HH:MM:SS"
-                        " (ex: 2022-06-22_13:52:45)")
-
-            if (start_date > datetime.now()) and (end_date > datetime.now()):
-                raise ValueError("Neither dates has come yet")
-
-            if start_date > end_date:
-                raise ValueError("start_date should be before end date")
-
-            if end_date > datetime.now():
-                end_date = datetime.now()
-                print("end_date has not come yet,"
-                      " data is downloaded from start_date"
-                      "to most recent date online")
-
-            directory_path = arguments[2]
+        start_date, end_date, source, directory_path, monthly =\
+            None, None, None, None, None
+        # TODO: fix the rgs issue, for now we assume no args
+        # aux = pathlib.Path(__file__).parent.parent / "data"
+        # if pathlib.Path(aux) / "data_aggregating" in arguments[2] \
+        #         or pathlib.Path(aux) / "data_scraping" in arguments[2]:
+        #     raise ValueError("You cannot use default directory in manual mode,"
+        #                      " please select another directory")
+        # elif not os.path.isdir(arguments[2]):
+        #     raise ValueError("Path does not exist")
+        # else:
+        #     try:
+        #         start_date = datetime.strptime(arguments[0], "%Y-%m")
+        #         end_date = datetime.strptime(arguments[1], "%Y-%m")
+        #         source = "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/monthly/"
+        #         monthly = True
+        #     except ValueError:
+        #         try:
+        #             start_date = \
+        #                 datetime.strptime(arguments[0], "%Y-%m-%d_%H:%M:%S")
+        #             end_date = \
+        #                 datetime.strptime(arguments[1], "%Y-%m-%d_%H:%M:%S")
+        #             source = \
+        #                 "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/daily/"
+        #             monthly = False
+        #         except ValueError:
+        #             raise ValueError(
+        #                 "Could not parse date,"
+        #                 " expected format is : YYYY-MM-dd_HH:MM:SS"
+        #                 " (ex: 2022-06-22_13:52:45)")
+        #
+        #     if (start_date > datetime.now()) and (end_date > datetime.now()):
+        #         raise ValueError("Neither dates has come yet")
+        #
+        #     if start_date > end_date:
+        #         raise ValueError("start_date should be before end date")
+        #
+        #     if end_date > datetime.now():
+        #         end_date = datetime.now()
+        #         print("end_date has not come yet,"
+        #               " data is downloaded from start_date"
+        #               "to most recent date online")
+        #
+        #     directory_path = arguments[2]
 
     return start_date, end_date, source, directory_path, monthly
 
