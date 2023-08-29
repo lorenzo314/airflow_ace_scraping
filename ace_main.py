@@ -1,5 +1,7 @@
 import pendulum
 
+import sys
+
 from airflow.decorators import dag
 from airflow.models.param import Param
 
@@ -15,7 +17,10 @@ import ace_utils as au
 def pipeline_scrape_ace_data():
     measuring_devices=['mag', 'swepam', 'epam', 'sis']
     for p in measuring_devices:
-        print(p)
+        print("xxxxxxx " + p)
+
+    print()
+    au.check_passed_arguments(sys.argv)
 
 
 pipeline_scrape_ace_data()
