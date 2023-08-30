@@ -9,24 +9,24 @@ import ace_utils as au
 
 
 @dag(
-    schedule="31 15 * * *",
+    schedule="35 8 * * *",
     start_date=pendulum.datetime(2023, 8, 1, tz="UTC"),
     catchup=False,
     tags=["ace_scraping"]
 )
-def pipeline_scrape_ace_data():
+def ace_scraping():
     measuring_devices=['mag', 'swepam', 'epam', 'sis']
     for p in measuring_devices:
         print("xxxxxxx " + p)
 
     print()
     start_date, end_date, source, directory_path, monthly =\
-        au.check_passed_arguments(sys.argv)
+        au.check_passed_arguments_test(sys.argv)
 
     print(start_date, end_date, source, directory_path, monthly)
 
 
-pipeline_scrape_ace_data()
+ace_scraping()
 
 #
 #

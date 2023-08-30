@@ -30,6 +30,30 @@ def is_url(url):
         return True
 
 
+@task()
+def check_passed_arguments_test():
+    """
+    Developed to test the DAG in local environment
+    TODO: it will be necessary to settle the args issue in DAGS
+
+    The code is from the check_passes_arguments function for the
+    automatic download case
+    """
+
+    # default: download the daily file
+    start_date = datetime.now()
+    end_date = None
+
+    directory_path = pathlib.Path(__file__).parent.parent / 'data'
+
+    source = "https://services.swpc.noaa.gov/text/"
+    # address Arnaud
+
+    monthly = None
+
+    return start_date, end_date, source, directory_path, monthly
+
+
 def check_passed_arguments(argv):
     """
     Check the number of passed arguments.
