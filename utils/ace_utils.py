@@ -1,6 +1,7 @@
 import pathlib
 import pandas as pd
 import os
+import os.path
 from tqdm.auto import tqdm
 from datetime import datetime
 from urllib import request
@@ -8,26 +9,6 @@ import re
 import requests
 
 from airflow.decorators import task
-
-
-def is_url(url):
-    """
-    Check if the passed url exists or not
-
-    INPUT:
-    :param: url (str)      url to test
-
-    OUTPUT: True if the url exists, False if not
-    """
-    r = requests.get(url)
-    if r.status_code == 429:
-        print('Retry URL checking (429)')
-        time.sleep(5)
-        return is_url(url)
-    elif r.status_code == 404:
-        return False
-    else:
-        return True
 
 
 @task()
@@ -44,14 +25,66 @@ def check_passed_arguments_test():
     start_date = datetime.now()
     end_date = None
 
-    directory_path = pathlib.Path(__file__).parent.parent / 'data'
+    directory_path = "/home/lorenzo/spaceable/airflow_ace_scraping/test_data"
 
     source = "https://services.swpc.noaa.gov/text/"
     # address Arnaud
 
     monthly = None
 
-    return start_date, end_date, source, directory_path, monthly
+    # ti.xcom_push("start_date", start_date)
+    # ti.xcom_push("end_date", end_date)
+    # ti.xcom_push("directory_path", directory_path)
+    # ti.xcom_push("monthly", monthly)
+
+    # A DECORATED FUNCTION SHOULD RETURN A DICTIONARY, OTHERWISE IT GIVES ERRORS
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "source": source,
+        "directory_path": directory_path,
+        "monthly": monthly
+    }
+
+
+@task()
+def show_passed_arguments(passed_arguments_dict: dict):
+    print("Starting show_passed_arguments")
+    print(passed_arguments_dict["start_date"])
+    print(passed_arguments_dict["end_date"])
+    print(passed_arguments_dict["source"])
+    print(passed_arguments_dict["directory_path"])
+    print(passed_arguments_dict["monthly"])
+    print("Finishing show_passed_arguments")
+
+
+@task()
+def save_passed_arguments_locally(passed_arguments_dict: dict):
+    date_time = datetime.now()
+    str_date_time = date_time.strftime("%d-%m-%YT%H:%M:%S")
+    str_date_time = f"{str_date_time}.txt"
+    output_file = os.path.join(
+        passed_arguments_dict["directory_path"],
+        str_date_time
+    )
+
+    with open(output_file, "w") as file:
+        if passed_arguments_dict["start_date"] is not None:
+            file.write(f'{passed_arguments_dict["start_date"].strftime("%m/%d/%Y")}\n')
+        else:
+            file.write(f'{str(None)}\n')
+        if passed_arguments_dict["end_date"] is not None:
+            file.write(f'{passed_arguments_dict["end_date"].strftime("%m/%d/%Y")}\n')
+        else:
+            file.write(f'{str(None)}\n')
+        if passed_arguments_dict["source"] is not None:
+            file.write(f'{passed_arguments_dict["source"]}\n')
+        else:
+            file.write(f'{str(None)}\n')
+        if passed_arguments_dict["directory_path"] is not None:
+            file.write(f'{passed_arguments_dict["directory_path"]}\n')
+        else:
+            file.write(f'{str(None)}\n')
 
 
 def check_passed_arguments(argv):
@@ -382,3 +415,23 @@ def download_data(list_url, directory_path, start_date, monthly=False):
 
                 # grab the file
                 request.urlretrieve(url, directory_path + "/" + device + "/" + file_name)
+
+
+def is_url(url):
+    """
+    Check if the passed url exists or not
+
+    INPUT:
+    :param: url (str)      url to test
+
+    OUTPUT: True if the url exists, False if not
+    """
+    r = requests.get(url)
+    if r.status_code == 429:
+        print('Retry URL checking (429)')
+        time.sleep(5)
+        return is_url(url)
+    elif r.status_code == 404:
+        return False
+    else:
+        return True

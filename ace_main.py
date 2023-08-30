@@ -16,14 +16,27 @@ import ace_utils as au
 )
 def ace_scraping():
     measuring_devices=['mag', 'swepam', 'epam', 'sis']
-    for p in measuring_devices:
-        print("xxxxxxx " + p)
 
-    print()
-    start_date, end_date, source, directory_path, monthly =\
-        au.check_passed_arguments_test(sys.argv)
+    passed_arguments_dict = au.check_passed_arguments_test()
 
-    print(start_date, end_date, source, directory_path, monthly)
+    au.show_passed_arguments(passed_arguments_dict)
+
+    au.save_passed_arguments_locally(passed_arguments_dict)
+
+    # print()
+    # print(type(passed_arguments_dict))
+    # print()
+    #
+    # print()
+    # print(passed_arguments_dict["start_date"])
+    # print()
+    # print(passed_arguments_dict["end_date"])
+    # print()
+    # print(passed_arguments_dict["source"])
+    # print()
+    # print(passed_arguments_dict["directory_path"])
+    # print()
+    # print(passed_arguments_dict["monthly"])
 
 
 ace_scraping()
