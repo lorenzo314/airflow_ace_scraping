@@ -12,7 +12,7 @@ from airflow.decorators import task
 
 
 @task()
-def check_passed_arguments_test():
+def initialize_variables():
     """
     Developed to test the DAG in local environment
     TODO: it will be necessary to settle the args issue in DAGS
@@ -25,19 +25,16 @@ def check_passed_arguments_test():
     start_date = datetime.now()
     end_date = None
 
-    directory_path = "/home/lorenzo/spaceable/airflow_ace_scraping/test_data"
+    directory_path = \
+        "/home/lorenzo/spaceable/airflow_ace_scraping/test_data"
 
     source = "https://services.swpc.noaa.gov/text/"
     # address Arnaud
 
     monthly = None
 
-    # ti.xcom_push("start_date", start_date)
-    # ti.xcom_push("end_date", end_date)
-    # ti.xcom_push("directory_path", directory_path)
-    # ti.xcom_push("monthly", monthly)
-
-    # A DECORATED FUNCTION SHOULD RETURN A DICTIONARY, OTHERWISE IT GIVES ERRORS
+    # A DECORATED FUNCTION SHOULD RETURN A DICTIONARY,
+    # OTHERWISE IT GIVES ERRORS
     return {
         "start_date": start_date,
         "end_date": end_date,
@@ -48,20 +45,9 @@ def check_passed_arguments_test():
 
 
 @task()
-def show_passed_arguments(passed_arguments_dict: dict):
-    print("Starting show_passed_arguments")
-    print(passed_arguments_dict["start_date"])
-    print(passed_arguments_dict["end_date"])
-    print(passed_arguments_dict["source"])
-    print(passed_arguments_dict["directory_path"])
-    print(passed_arguments_dict["monthly"])
-    print("Finishing show_passed_arguments")
-
-
-@task()
 def save_passed_arguments_locally(passed_arguments_dict: dict):
     date_time = datetime.now()
-    str_date_time = date_time.strftime("%d-%m-%YT%H:%M:%S")
+    str_date_time = date_time.strftime("%d%m%YT%H%M%S")
     str_date_time = f"{str_date_time}.txt"
     output_file = os.path.join(
         passed_arguments_dict["directory_path"],
@@ -85,6 +71,54 @@ def save_passed_arguments_locally(passed_arguments_dict: dict):
             file.write(f'{passed_arguments_dict["directory_path"]}\n')
         else:
             file.write(f'{str(None)}\n')
+
+
+@task()
+def get_dates_in_time_interval(passed_arguments_dict: dict):
+    """
+    Get the dates over the selected time interval.
+    For manual mode, frequency is either month or day.
+    For automatic mode, frequency is day.
+    For automatic mode, the right time bound is equal to the left time bound.
+
+    Parameters
+    ----------
+    passed_arguments_dict : a dictionary containing
+    1 start_date : datetime.datetime
+        the left bound for generating scraping time interval.
+    2 end_date : datetime.datetime
+        Right bound for generating scraping time interval.
+    3 monthly : bool
+        If True, frequency is month (manual mode).
+        If False, frequency is day.
+        If False and end_date is None,
+        the right time bound is equal to the left time bound
+
+    Returns
+    -------
+    A dictionary containing the 3 keys in input plus
+    dates_in_time_interval : DatetimeIndex
+    The range of equally spaced time points between start_date and end_date.
+    """
+
+    start_date = passed_arguments_dict["start_date"]
+    end_date = passed_arguments_dict["end_date"]
+    monthly = passed_arguments_dict["monthly"]
+
+    if monthly is True:
+        dates_in_time_interval = pd.date_range(
+            start_date, end_date, freq='MS'
+        )
+    else:
+        if end_date is None:
+            end_date = start_date
+
+        dates_in_time_interval = pd.date_range(
+            start_date, end_date, freq='d'
+        )
+
+    passed_arguments_dict["dates_in_time_interval"] = dates_in_time_interval
+    return passed_arguments_dict
 
 
 def check_passed_arguments(argv):
@@ -259,40 +293,40 @@ def create_directory(directory_path, measuring_devices, monthly=False):
     return data_scraping_directory
 
 
-def get_dates_in_time_interval(start_date, end_date, monthly):
-    """
-    Get the dates over the selected time interval.
-    For manual mode, frequency is either month or day.
-    For automatic mode, frequency is day.
-    For automatic mode, the right time bound is equal to the left time bound.
-
-    Parameters
-    ----------
-    start_date : datetime.datetime
-        Left bound for generating scraping time interval.
-    end_date : datetime.datetime
-        Right bound for generating scraping time interval.
-    monthly : bool
-        If True, frequency is month (manual mode).
-        If False, frequency is day.
-        If False and end_date is None,
-        the right time bound is equal to the left time bound
-
-    Returns
-    -------
-    dates_in_time_interval : DatetimeIndex
-        Return the range of equally spaced time points between start_date and end_date.
-
-    """
-    if monthly is True:
-        dates_in_time_interval = pd.date_range(start_date, end_date, freq='MS')
-    else:
-        if end_date is None:
-            end_date = start_date
-
-        dates_in_time_interval = pd.date_range(start_date, end_date, freq='d')
-
-    return dates_in_time_interval
+# def get_dates_in_time_interval(start_date, end_date, monthly):
+#     """
+#     Get the dates over the selected time interval.
+#     For manual mode, frequency is either month or day.
+#     For automatic mode, frequency is day.
+#     For automatic mode, the right time bound is equal to the left time bound.
+#
+#     Parameters
+#     ----------
+#     start_date : datetime.datetime
+#         Left bound for generating scraping time interval.
+#     end_date : datetime.datetime
+#         Right bound for generating scraping time interval.
+#     monthly : bool
+#         If True, frequency is month (manual mode).
+#         If False, frequency is day.
+#         If False and end_date is None,
+#         the right time bound is equal to the left time bound
+#
+#     Returns
+#     -------
+#     dates_in_time_interval : DatetimeIndex
+#         Return the range of equally spaced time points between start_date and end_date.
+#
+#     """
+#     if monthly is True:
+#         dates_in_time_interval = pd.date_range(start_date, end_date, freq='MS')
+#     else:
+#         if end_date is None:
+#             end_date = start_date
+#
+#         dates_in_time_interval = pd.date_range(start_date, end_date, freq='d')
+#
+#     return dates_in_time_interval
 
 
 def define_url_format(source, dates_in_time_interval, measuring_devices, directory_path):
@@ -435,3 +469,14 @@ def is_url(url):
         return False
     else:
         return True
+
+
+@task()
+def show_passed_arguments(passed_arguments_dict: dict):
+    print("Starting show_passed_arguments")
+    print(passed_arguments_dict["start_date"])
+    print(passed_arguments_dict["end_date"])
+    print(passed_arguments_dict["source"])
+    print(passed_arguments_dict["directory_path"])
+    print(passed_arguments_dict["monthly"])
+    print("Finishing show_passed_arguments")

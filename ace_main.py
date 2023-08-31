@@ -1,9 +1,6 @@
 import pendulum
 
-import sys
-
 from airflow.decorators import dag
-from airflow.models.param import Param
 
 import ace_utils as au
 
@@ -15,28 +12,21 @@ import ace_utils as au
     tags=["ace_scraping"]
 )
 def ace_scraping():
-    measuring_devices=['mag', 'swepam', 'epam', 'sis']
+    # measuring_devices = ['mag', 'swepam', 'epam', 'sis']
 
-    passed_arguments_dict = au.check_passed_arguments_test()
+    passed_arguments_dict = au.initialize_variables()
 
-    au.show_passed_arguments(passed_arguments_dict)
+    # au.show_passed_arguments(passed_arguments_dict)
 
     au.save_passed_arguments_locally(passed_arguments_dict)
 
-    # print()
-    # print(type(passed_arguments_dict))
-    # print()
-    #
-    # print()
-    # print(passed_arguments_dict["start_date"])
-    # print()
-    # print(passed_arguments_dict["end_date"])
-    # print()
-    # print(passed_arguments_dict["source"])
-    # print()
-    # print(passed_arguments_dict["directory_path"])
-    # print()
-    # print(passed_arguments_dict["monthly"])
+    passed_arguments_dict = \
+        au.get_dates_in_time_interval(passed_arguments_dict)
+
+    dates_in_time_interval = passed_arguments_dict["dates_in_time_interval"]
+
+    for d in dates_in_time_interval:
+        print(d)
 
 
 ace_scraping()
