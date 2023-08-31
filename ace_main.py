@@ -1,6 +1,6 @@
 import pendulum
 
-from airflow.decorators import dag
+from airflow.decorators import dag, task
 
 import ace_utils as au
 
@@ -12,6 +12,14 @@ import ace_utils as au
     tags=["ace_scraping"]
 )
 def ace_scraping():
+    @task()
+    def print_dates(x: dict):
+        # for d in dates_in_time_interval_par:
+        #    print(d)
+        print()
+        # print(type(dates_in_time_interval_par))
+        print()
+
     # measuring_devices = ['mag', 'swepam', 'epam', 'sis']
 
     passed_arguments_dict = au.initialize_variables()
@@ -25,8 +33,7 @@ def ace_scraping():
 
     dates_in_time_interval = passed_arguments_dict["dates_in_time_interval"]
 
-    for d in dates_in_time_interval:
-        print(d)
+    print_dates(passed_arguments_dict)
 
 
 ace_scraping()

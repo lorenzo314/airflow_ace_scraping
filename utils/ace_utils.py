@@ -1,5 +1,6 @@
-import pathlib
+# import pathlib
 import pandas as pd
+import json
 import os
 import os.path
 from tqdm.auto import tqdm
@@ -75,6 +76,11 @@ def save_passed_arguments_locally(passed_arguments_dict: dict):
 
 @task()
 def get_dates_in_time_interval(passed_arguments_dict: dict):
+    def serialize_datetime(obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        raise TypeError("Type not serializable")
+
     """
     Get the dates over the selected time interval.
     For manual mode, frequency is either month or day.
@@ -117,7 +123,14 @@ def get_dates_in_time_interval(passed_arguments_dict: dict):
             start_date, end_date, freq='d'
         )
 
+    # Transform the DatetimeIndex type in a type that can be serialized
+    dates_in_time_interval = list(dates_in_time_interval)
+    tmp_list = [i.to_pydatetime() for i in dates_in_time_interval]
+    dates_in_time_interval = \
+        [json.dumps(i, default=serialize_datetime) for i in tmp_list]
+
     passed_arguments_dict["dates_in_time_interval"] = dates_in_time_interval
+
     return passed_arguments_dict
 
 
