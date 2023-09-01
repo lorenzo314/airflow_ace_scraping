@@ -1,3 +1,9 @@
+# ONLY AUTOMATIC DOWNLOAD IMPLEMENTED FOR NOW
+# NO ARGUMENTS PASSED TO THE MAIN FUNCTION
+# TODO: Implement manual download
+# TODO: Settle the args issue in DAGS
+# TODO: Clarify if it is possible to use DAG params with TaskFlow
+
 # import pathlib
 import pandas as pd
 import json
@@ -13,7 +19,7 @@ from airflow.decorators import task
 
 
 @task()
-def initialize_variables():
+def initialize_date_and_directory_path():
     """
     Developed to test the DAG in local environment
     TODO: it will be necessary to settle the args issue in DAGS
@@ -43,35 +49,6 @@ def initialize_variables():
         "directory_path": directory_path,
         "monthly": monthly
     }
-
-
-@task()
-def save_passed_arguments_locally(passed_arguments_dict: dict):
-    date_time = datetime.now()
-    str_date_time = date_time.strftime("%d%m%YT%H%M%S")
-    str_date_time = f"{str_date_time}.txt"
-    output_file = os.path.join(
-        passed_arguments_dict["directory_path"],
-        str_date_time
-    )
-
-    with open(output_file, "w") as file:
-        if passed_arguments_dict["start_date"] is not None:
-            file.write(f'{passed_arguments_dict["start_date"].strftime("%m/%d/%Y")}\n')
-        else:
-            file.write(f'{str(None)}\n')
-        if passed_arguments_dict["end_date"] is not None:
-            file.write(f'{passed_arguments_dict["end_date"].strftime("%m/%d/%Y")}\n')
-        else:
-            file.write(f'{str(None)}\n')
-        if passed_arguments_dict["source"] is not None:
-            file.write(f'{passed_arguments_dict["source"]}\n')
-        else:
-            file.write(f'{str(None)}\n')
-        if passed_arguments_dict["directory_path"] is not None:
-            file.write(f'{passed_arguments_dict["directory_path"]}\n')
-        else:
-            file.write(f'{str(None)}\n')
 
 
 @task()
@@ -132,6 +109,221 @@ def get_dates_in_time_interval(passed_arguments_dict: dict):
     passed_arguments_dict["dates_in_time_interval"] = dates_in_time_interval
 
     return passed_arguments_dict
+
+
+@task()
+def define_url_format(passed_arguments_dict: dict):
+    """
+    Build complete urls for each date and each measuring device,
+    with format depending on the data source.
+
+    Parameters
+    ----------
+    passed_arguments_dict : dict
+        Contains:
+        1: Website address for data scraping.
+        2: dates_in_time_interval : DatetimeIndex
+        Range of equally spaced time points between start_date and end_date
+        3: measuring_devices : list
+        A list of measuring devices: mag', 'swepam', 'epam', 'sis'.
+        4: directory_path : str
+        The directory path
+
+    Raises
+    ------
+    ValueError
+        Warning about potential mix-up between sources and file_name format.
+
+    Returns
+    -------
+    list_url : list
+        A list of all the complete urls for each date and each measuring devices.
+    """
+
+    source = passed_arguments_dict["source"]
+    dates_in_time_interval = passed_arguments_dict["dates_in_time_interval"]
+    measuring_devices = passed_arguments_dict["measuring_devices"]
+    directory_path = passed_arguments_dict["directory_path"]
+
+    list_url = []
+    for device in measuring_devices:
+        # Next 4 lines because on one url, the device is called "magnetometer",
+        # and on the other "mag"
+        if device in "mag":
+            nasa_device = "magnetometer"
+        else:
+            nasa_device = device
+
+        for date in dates_in_time_interval:
+            # for automatic download
+            # ONLY AUTOMATIC DOWNLOAD IMPLEMENTED FOR NOW
+            if source == 'https://services.swpc.noaa.gov/text/':
+                # date_format = "%Y-%m-%d_%H-%M-%S"
+                # formatted_date = date.strftime(date_format)
+                remote_file_name = "ace-" + nasa_device + ".txt"
+                url = source + remote_file_name
+                list_url.append(url)
+            # for manual download of monthly files
+            elif source == "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/monthly/":
+                date_format = "%Y%m"
+                interval = "1h"
+                formatted_date = date.strftime(date_format)
+                file_name = \
+                    formatted_date + "_ace_" + device + "_" + interval + ".txt"
+
+                # create list of url for files not in the directory
+                if not os.path.isfile(directory_path + device + '/' + file_name):
+                    url = source + file_name
+                    list_url.append(url)
+            # for manual download of daily files
+            elif source == "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/daily/":
+                date_format = "%Y%m%d"
+                interval = get_interval(device)
+                formatted_date = date.strftime(date_format)
+                file_name = \
+                    formatted_date + "_ace_" + device + "_" + interval + ".txt"
+
+                # create list of url for files not in the directory
+                if not os.path.isfile(
+                        directory_path + device + '/' + file_name):
+                    url = source + file_name
+                    list_url.append(url)
+            else:
+                raise ValueError("Your local source does match any default sources,"
+                                 " please check sources ")
+
+    passed_arguments_dict["list_url"] = list_url
+
+    return passed_arguments_dict
+
+
+@task()
+def save_passed_arguments_locally(passed_arguments_dict: dict):
+    date_time = datetime.now()
+    str_date_time = date_time.strftime("%d%m%YT%H%M%S")
+    str_date_time = f"{str_date_time}.txt"
+    output_file = os.path.join(
+        passed_arguments_dict["directory_path"],
+        str_date_time
+    )
+
+    with open(output_file, "w") as file:
+        if passed_arguments_dict["start_date"] is not None:
+            file.write(f'start_date {passed_arguments_dict["start_date"].strftime("%m/%d/%Y")}\n')
+        else:
+            file.write(f'start_date {str(None)}\n')
+
+        if passed_arguments_dict["end_date"] is not None:
+            file.write(
+                f'end_date {passed_arguments_dict["end_date"].strftime("%m/%d/%Y")}\n'
+            )
+        else:
+            file.write(f'end_date {str(None)}\n')
+
+        if passed_arguments_dict["source"] is not None:
+            file.write(f'source {passed_arguments_dict["source"]}\n')
+        else:
+            file.write(f'source {str(None)}\n')
+
+        if passed_arguments_dict["directory_path"] is not None:
+            file.write(f'directory_path {passed_arguments_dict["directory_path"]}\n')
+        else:
+            file.write(f'directory_path {str(None)}\n')
+
+        if passed_arguments_dict["dates_in_time_interval"] is not None:
+            dates_in_time_interval = passed_arguments_dict["dates_in_time_interval"]
+            assert type(dates_in_time_interval) == list
+            for i in dates_in_time_interval:
+                assert type(i) == str
+                file.write(f'dates_in_time_interval {i}\n')
+        else:
+            file.write(f'dates_in_time_interval {str(None)}\n')
+
+        if passed_arguments_dict["measuring_devices"] is not None:
+            measuring_devices = passed_arguments_dict["measuring_devices"]
+            assert type(measuring_devices) == list
+            for i in measuring_devices:
+                file.write(f'measuring device {i}\n')
+            else:
+                file.write(f'measuring devices {str(None)}\n')
+
+        if passed_arguments_dict["list_url"] is not None:
+            list_url = passed_arguments_dict["list_url"]
+            assert type(list_url) == list
+            for i in list_url:
+                file.write(f'url {i}\n')
+        else:
+            file.write(f'list url {str(None)}\n')
+
+
+@task()
+def download_data(list_url, directory_path, start_date, monthly=False):
+    """
+    Download data files from all the urls into the saving directories.
+    Track download progress
+
+    Parameters
+    ----------
+    list_url : list
+        List of all the complete urls for each date and each measuring devices.
+    directory_path : str
+        Path pointing to the directories where files are saved.
+    start_date : datetime.datetime
+        Left bound for generating scraping time interval.
+        Used to build the file_name in automatic mode.
+    monthly : bool, optional
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    Write .txt files and save them in the selected directories.
+
+    """
+    if list_url:
+        for url in tqdm(list_url):
+            check_url = utils.is_url(url)
+            if not check_url:
+                print(url + " doesn't exist")
+            else:
+                if "daily" in directory_path or "monthly" in directory_path:
+                    # manual case
+                    file_name = url.split('/')[-1]
+                    device = file_name.split("_")[2]
+                else:
+                    # automatic case
+                    date_format = "%Y-%m-%d_%H-%M-%S"
+                    formatted_date = start_date.strftime(date_format)
+                    device = re.split(r'[\-.]+', url)[-2]
+                    file_name = formatted_date + "_donnees_" + device + ".txt"
+
+                # grab the file
+                request.urlretrieve(url, directory_path + "/" + device + "/" + file_name)
+
+
+def is_url(url):
+    """
+    Check if the passed url exists or not
+
+    INPUT:
+    :param: url (str)      url to test
+
+    OUTPUT: True if the url exists, False if not
+    """
+    r = requests.get(url)
+    if r.status_code == 429:
+        print('Retry URL checking (429)')
+        time.sleep(5)
+        return is_url(url)
+    elif r.status_code == 404:
+        return False
+    else:
+        return True
+
+#############################################################################
+#
+# ORIGINAL CODE
+#
+#############################################################################
 
 
 def check_passed_arguments(argv):
@@ -195,6 +387,7 @@ def check_passed_arguments(argv):
 
         source = "https://services.swpc.noaa.gov/text/"
         # address Arnaud
+        # Automatic download, the only one implemented
 
         monthly = None
     else:
@@ -342,82 +535,82 @@ def create_directory(directory_path, measuring_devices, monthly=False):
 #     return dates_in_time_interval
 
 
-def define_url_format(source, dates_in_time_interval, measuring_devices, directory_path):
-    """
-    Build complete urls for each date and each measuring device,
-    with format depending on the data source.
-
-    Parameters
-    ----------
-    source : str
-        Website address for data scraping.
-    dates_in_time_interval : DatetimeIndex
-        Range of equally spaced time points between start_date and end_date
-    measuring_devices : list
-        A list of measuring devices: mag', 'swepam', 'epam', 'sis'.
-    directory_path : str
-        The directory path
-
-    Raises
-    ------
-    ValueError
-        Warning about potential mix-up between sources and file_name format.
-
-    Returns
-    -------
-    list_url : list
-        A list of all the complete urls for each date and each measuring devices.
-    """
-
-    list_url = []
-    for device in measuring_devices:
-        # Next 4 lines because on one url, the device is called "magnetometer",
-        # and on the other "mag"
-        if device in "mag":
-            nasa_device = "magnetometer"
-        else:
-            nasa_device = device
-
-        for date in dates_in_time_interval:
-            # for automatic download
-            if source == "https://services.swpc.noaa.gov/text/":
-                # date_format = "%Y-%m-%d_%H-%M-%S"
-                # formatted_date = date.strftime(date_format)
-                remote_file_name = "ace-" + nasa_device + ".txt"
-                url = source + remote_file_name
-                list_url.append(url)
-
-            # for manual download of monthly files
-            elif source == "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/monthly/":
-                date_format = "%Y%m"
-                interval = "1h"
-                formatted_date = date.strftime(date_format)
-                file_name = \
-                    formatted_date + "_ace_" + device + "_" + interval + ".txt"
-
-                # create list of url for files not in the directory
-                if not os.path.isfile(directory_path + device + '/' + file_name):
-                    url = source + file_name
-                    list_url.append(url)
-
-            # for manual download of daily files
-            elif source == "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/daily/":
-                date_format = "%Y%m%d"
-                interval = get_interval(device)
-                formatted_date = date.strftime(date_format)
-                file_name = \
-                    formatted_date + "_ace_" + device + "_" + interval + ".txt"
-
-                # create list of url for files not in the directory
-                if not os.path.isfile(
-                        directory_path + device + '/' + file_name):
-                    url = source + file_name
-                    list_url.append(url)
-            else:
-                raise ValueError("Your local source does match any default sources,"
-                                 " please check sources ")
-
-    return list_url
+# def define_url_format(source, dates_in_time_interval, measuring_devices, directory_path):
+#     """
+#     Build complete urls for each date and each measuring device,
+#     with format depending on the data source.
+#
+#     Parameters
+#     ----------
+#     source : str
+#         Website address for data scraping.
+#     dates_in_time_interval : DatetimeIndex
+#         Range of equally spaced time points between start_date and end_date
+#     measuring_devices : list
+#         A list of measuring devices: mag', 'swepam', 'epam', 'sis'.
+#     directory_path : str
+#         The directory path
+#
+#     Raises
+#     ------
+#     ValueError
+#         Warning about potential mix-up between sources and file_name format.
+#
+#     Returns
+#     -------
+#     list_url : list
+#         A list of all the complete urls for each date and each measuring devices.
+#     """
+#
+#     list_url = []
+#     for device in measuring_devices:
+#         # Next 4 lines because on one url, the device is called "magnetometer",
+#         # and on the other "mag"
+#         if device in "mag":
+#             nasa_device = "magnetometer"
+#         else:
+#             nasa_device = device
+#
+#         for date in dates_in_time_interval:
+#             # for automatic download
+#             if source == "https://services.swpc.noaa.gov/text/":
+#                 # date_format = "%Y-%m-%d_%H-%M-%S"
+#                 # formatted_date = date.strftime(date_format)
+#                 remote_file_name = "ace-" + nasa_device + ".txt"
+#                 url = source + remote_file_name
+#                 list_url.append(url)
+#
+#             # for manual download of monthly files
+#             elif source == "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/monthly/":
+#                 date_format = "%Y%m"
+#                 interval = "1h"
+#                 formatted_date = date.strftime(date_format)
+#                 file_name = \
+#                     formatted_date + "_ace_" + device + "_" + interval + ".txt"
+#
+#                 # create list of url for files not in the directory
+#                 if not os.path.isfile(directory_path + device + '/' + file_name):
+#                     url = source + file_name
+#                     list_url.append(url)
+#
+#             # for manual download of daily files
+#             elif source == "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/daily/":
+#                 date_format = "%Y%m%d"
+#                 interval = get_interval(device)
+#                 formatted_date = date.strftime(date_format)
+#                 file_name = \
+#                     formatted_date + "_ace_" + device + "_" + interval + ".txt"
+#
+#                 # create list of url for files not in the directory
+#                 if not os.path.isfile(
+#                         directory_path + device + '/' + file_name):
+#                     url = source + file_name
+#                     list_url.append(url)
+#             else:
+#                 raise ValueError("Your local source does match any default sources,"
+#                                  " please check sources ")
+#
+#     return list_url
 
 
 @task()

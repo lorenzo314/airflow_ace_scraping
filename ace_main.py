@@ -1,6 +1,6 @@
 import pendulum
 
-from airflow.decorators import dag, task
+from airflow.decorators import dag
 
 import ace_utils as au
 
@@ -12,28 +12,45 @@ import ace_utils as au
     tags=["ace_scraping"]
 )
 def ace_scraping():
-    @task()
-    def print_dates(x: dict):
-        # for d in dates_in_time_interval_par:
-        #    print(d)
-        print()
-        # print(type(dates_in_time_interval_par))
-        print()
+    # @task()
+    # def print_dates(passed_arguments_dict_p: dict):
+    #     print("hello")
+    #     dates_in_time_interval_p = passed_arguments_dict_p["dates_in_time_interval"]
+    #     print("--------------------------")
+    #     for d in dates_in_time_interval_p:
+    #         print(d)
+    #         print(type(d))
+    #         print("--------------------------")
+    #     print("--------------------------")
+    #     print(type(dates_in_time_interval_p))
+    #     print(len(dates_in_time_interval_p))
+    #     print("--------------------------")
 
-    # measuring_devices = ['mag', 'swepam', 'epam', 'sis']
+    measuring_devices = ['mag', 'swepam', 'epam', 'sis']
 
-    passed_arguments_dict = au.initialize_variables()
+    # Get the start and en dates and the directory path
+    # Retrieves the current day as start date and One as end date since
+    # this is done in automatic mode
+    # The directory path is a local one
+    passed_arguments_dict = au.initialize_date_and_directory_path()
 
-    # au.show_passed_arguments(passed_arguments_dict)
-
-    au.save_passed_arguments_locally(passed_arguments_dict)
-
+    # Get the date range to query
+    # In automatic mode it is just the current date
     passed_arguments_dict = \
         au.get_dates_in_time_interval(passed_arguments_dict)
 
-    dates_in_time_interval = passed_arguments_dict["dates_in_time_interval"]
+    passed_arguments_dict["measuring_devices"] = measuring_devices
 
-    print_dates(passed_arguments_dict)
+    passed_arguments_dict = au.define_url_format(passed_arguments_dict)
+
+    # Save parameters on local file
+    au.save_passed_arguments_locally(passed_arguments_dict)
+
+    # print_dates(passed_arguments_dict)
+    # au.show_passed_arguments(passed_arguments_dict)
+    # au.save_passed_arguments_locally(passed_arguments_dict)
+    # dates_in_time_interval = passed_arguments_dict["dates_in_time_interval"]
+    # passed_arguments_dict["measuring_devices"] = measuring_devices
 
 
 ace_scraping()
