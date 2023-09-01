@@ -4,7 +4,7 @@
 # TODO: Settle the args issue in DAGS
 # TODO: Clarify if it is possible to use DAG params with TaskFlow
 
-# import pathlib
+import pathlib
 import pandas as pd
 import json
 import os
@@ -111,6 +111,15 @@ def get_dates_in_time_interval(passed_arguments_dict: dict):
     return passed_arguments_dict
 
 
+@task
+def get_measuring_devices(passed_arguments_dict: dict):
+    measuring_devices = ['mag', 'swepam', 'epam', 'sis']
+
+    passed_arguments_dict["measuring_devices"] = measuring_devices
+
+    return passed_arguments_dict
+
+
 @task()
 def define_url_format(passed_arguments_dict: dict):
     """
@@ -198,6 +207,95 @@ def define_url_format(passed_arguments_dict: dict):
 
 
 @task()
+def download_data(passed_arguments_dict: dict):
+    """
+    Download data files from all the urls into the saving directories.
+    Track download progress
+
+    Parameters
+    ----------
+    passed_arguments_dict: dict
+    A dictionary containing
+        1 list_url : list
+            arg of all the complete urls for each date and each measuring devices.
+        2 directory_path : str
+            Path pointing to the directories where files are saved.
+        3 start_date : datetime.datetime
+            Left bound for generating scraping time interval.
+            Used to build the file_name in automatic mode.
+        4 monthly : bool, optional
+            DESCRIPTION. The default is False.
+            NOT USED IN AUTOMATIC MODE
+
+    Returns
+    -------
+    Write .txt files and save them in the selected directories.
+    """
+
+    start_date = passed_arguments_dict["start_date"]
+    directory_path = passed_arguments_dict["directory_path"]
+    list_url = passed_arguments_dict["list_url"]
+
+    output_files = []
+
+    if list_url:
+        for url in tqdm(list_url):
+            check_url = is_url(url)
+            if not check_url:
+                print(url + " doesn't exist")
+            else:
+                if "daily" in directory_path or "monthly" in directory_path:
+                    # manual case
+                    # NOT IMPLEMENTED FOR NOW
+                    file_name = url.split('/')[-1]
+                    # device = file_name.split("_")[2]
+                else:
+                    # automatic case
+                    date_format = "%Y%m%dT%H%M%S"
+                    formatted_date = start_date.strftime(date_format)
+                    device = re.split(r'[\-.]+', url)[-2]
+                    file_name = formatted_date + "_donnees_" + device + ".txt"
+
+                # Name of output file
+                outname = os.path.join(directory_path, file_name)
+
+                # Creates an empty file with that name
+                # exist_ok=True by default, but specify it anyway
+                # It means that if it already exists it does not give an error
+                pathlib.Path(outname, exist_ok=True).touch()
+
+                # grab the file
+                request.urlretrieve(url, outname)
+
+                output_files.append(outname)
+
+    passed_arguments_dict["output_files"] = output_files
+
+    return passed_arguments_dict
+
+
+def is_url(url):
+    """
+    Check if the passed url exists or not
+
+    INPUT:
+    param: url (str)
+    url to test
+
+    OUTPUT: True if the url exists, False if not
+    """
+    r = requests.get(url)
+    if r.status_code == 429:
+        print('Retry URL checking (429)')
+        time.sleep(5)
+        return is_url(url)
+    elif r.status_code == 404:
+        return False
+    else:
+        return True
+
+
+@task()
 def save_passed_arguments_locally(passed_arguments_dict: dict):
     date_time = datetime.now()
     str_date_time = date_time.strftime("%d%m%YT%H%M%S")
@@ -244,8 +342,8 @@ def save_passed_arguments_locally(passed_arguments_dict: dict):
             assert type(measuring_devices) == list
             for i in measuring_devices:
                 file.write(f'measuring device {i}\n')
-            else:
-                file.write(f'measuring devices {str(None)}\n')
+        else:
+            file.write(f'measuring devices {str(None)}\n')
 
         if passed_arguments_dict["list_url"] is not None:
             list_url = passed_arguments_dict["list_url"]
@@ -255,69 +353,13 @@ def save_passed_arguments_locally(passed_arguments_dict: dict):
         else:
             file.write(f'list url {str(None)}\n')
 
-
-@task()
-def download_data(list_url, directory_path, start_date, monthly=False):
-    """
-    Download data files from all the urls into the saving directories.
-    Track download progress
-
-    Parameters
-    ----------
-    list_url : list
-        List of all the complete urls for each date and each measuring devices.
-    directory_path : str
-        Path pointing to the directories where files are saved.
-    start_date : datetime.datetime
-        Left bound for generating scraping time interval.
-        Used to build the file_name in automatic mode.
-    monthly : bool, optional
-        DESCRIPTION. The default is False.
-
-    Returns
-    -------
-    Write .txt files and save them in the selected directories.
-
-    """
-    if list_url:
-        for url in tqdm(list_url):
-            check_url = utils.is_url(url)
-            if not check_url:
-                print(url + " doesn't exist")
-            else:
-                if "daily" in directory_path or "monthly" in directory_path:
-                    # manual case
-                    file_name = url.split('/')[-1]
-                    device = file_name.split("_")[2]
-                else:
-                    # automatic case
-                    date_format = "%Y-%m-%d_%H-%M-%S"
-                    formatted_date = start_date.strftime(date_format)
-                    device = re.split(r'[\-.]+', url)[-2]
-                    file_name = formatted_date + "_donnees_" + device + ".txt"
-
-                # grab the file
-                request.urlretrieve(url, directory_path + "/" + device + "/" + file_name)
-
-
-def is_url(url):
-    """
-    Check if the passed url exists or not
-
-    INPUT:
-    :param: url (str)      url to test
-
-    OUTPUT: True if the url exists, False if not
-    """
-    r = requests.get(url)
-    if r.status_code == 429:
-        print('Retry URL checking (429)')
-        time.sleep(5)
-        return is_url(url)
-    elif r.status_code == 404:
-        return False
-    else:
-        return True
+        if passed_arguments_dict["output_files"] is not None:
+            output_files = passed_arguments_dict["output_files"]
+            assert type(output_files) == list
+            for i in output_files:
+                file.write(f'output file {i}\n')
+        else:
+            file.write(f'output_files {str(None)}\n')
 
 #############################################################################
 #
@@ -439,65 +481,64 @@ def check_passed_arguments(argv):
     return start_date, end_date, source, directory_path, monthly
 
 
-def create_directory(directory_path, measuring_devices, monthly=False):
-    """
-    For automatic mode: creates data/ directory to save scraped data files from source and one directory
-    to save processed (aggregated) data for each measuring device
-    For manual mode in the directory passed as parameters, creates
-    monthly / and a daily / directories, creates subdirectories
-    for each measuring device in these directories
-
-    Parameters
-    ----------
-    directory_path : str
-        Path pointing to the parent directory (set to be in gitlab in automatic mode )
-        where the directories are created.
-    measuring_devices : list
-        A list of measuring devices: mag', 'swepam', 'epam', 'sis'
-    monthly : bool
-        Default value is false, True when date arguments are passed in month format
-
-    Returns
-    -------
-    data_scraping_directory : str
-        Return parents directories of the measuring devices directories
-
-    """
-    # create a new directory for each measuring device
-    for device in measuring_devices:
-        if device in "mag":
-            nasa_device = "magnetometer"
-        else:
-            nasa_device = device
-        # automatic mode
-        if directory_path == pathlib.Path(__file__).parent.parent / 'data':
-
-            # Create directory to scrape data
-            data_scraping_directory = str(directory_path) + '/data_scraping/'
-            # data_device = os.path.join(data_scraping_directory, device, "")
-            data_device = os.path.join(data_scraping_directory, nasa_device, "")
-            if not os.path.exists(data_device):
-                os.makedirs(data_device)
-
-            # Create directory to process data
-            data_aggregating_directory = str(directory_path) + '/data_aggregating/'
-            data_device = os.path.join(data_aggregating_directory, nasa_device, "")
-            if not os.path.exists(data_device):
-                os.makedirs(data_device)
-
-        # manual mode
-        else:
-            if monthly:
-                data_scraping_directory = str(directory_path) + '/monthly/'
-            else:
-                data_scraping_directory = str(directory_path) + '/daily/'
-
-            data_device = os.path.join(data_scraping_directory, device, "")
-            if not os.path.exists(data_device):
-                os.makedirs(data_device)
-
-    return data_scraping_directory
-
+# def create_directory(directory_path, measuring_devices, monthly=False):
+#     """
+#     For automatic mode: creates data/ directory to save scraped data files from source and one directory
+#     to save processed (aggregated) data for each measuring device
+#     For manual mode in the directory passed as parameters, creates
+#     monthly / and a daily / directories, creates subdirectories
+#     for each measuring device in these directories
+#
+#     Parameters
+#     ----------
+#     directory_path : str
+#         Path pointing to the parent directory (set to be in gitlab in automatic mode )
+#         where the directories are created.
+#     measuring_devices : list
+#         A list of measuring devices: mag', 'swepam', 'epam', 'sis'
+#     monthly : bool
+#         Default value is false, True when date arguments are passed in month format
+#
+#     Returns
+#     -------
+#     data_scraping_directory : str
+#         Return parents directories of the measuring devices directories
+#
+#     """
+#     # create a new directory for each measuring device
+#     for device in measuring_devices:
+#         if device in "mag":
+#             nasa_device = "magnetometer"
+#         else:
+#             nasa_device = device
+#         # automatic mode
+#         if directory_path == pathlib.Path(__file__).parent.parent / 'data':
+#
+#             # Create directory to scrape data
+#             data_scraping_directory = str(directory_path) + '/data_scraping/'
+#             # data_device = os.path.join(data_scraping_directory, device, "")
+#             data_device = os.path.join(data_scraping_directory, nasa_device, "")
+#             if not os.path.exists(data_device):
+#                 os.makedirs(data_device)
+#
+#             # Create directory to process data
+#             data_aggregating_directory = str(directory_path) + '/data_aggregating/'
+#             data_device = os.path.join(data_aggregating_directory, nasa_device, "")
+#             if not os.path.exists(data_device):
+#                 os.makedirs(data_device)
+#
+#         # manual mode
+#         else:
+#             if monthly:
+#                 data_scraping_directory = str(directory_path) + '/monthly/'
+#             else:
+#                 data_scraping_directory = str(directory_path) + '/daily/'
+#
+#             data_device = os.path.join(data_scraping_directory, device, "")
+#             if not os.path.exists(data_device):
+#                 os.makedirs(data_device)
+#
+#     return data_scraping_directory
 
 # def get_dates_in_time_interval(start_date, end_date, monthly):
 #     """
@@ -612,77 +653,21 @@ def create_directory(directory_path, measuring_devices, monthly=False):
 #
 #     return list_url
 
-
-@task()
-def download_data(list_url, directory_path, start_date, monthly=False):
-    """
-    Download data files from all the urls into the saving directories.
-    Track download progress
-
-    Parameters
-    ----------
-    list_url : list
-        List of all the complete urls for each date and each measuring devices.
-    directory_path : str
-        Path pointing to the directories where files are saved.
-    start_date : datetime.datetime
-        Left bound for generating scraping time interval.
-        Used to build the file_name in automatic mode.
-    monthly : bool, optional
-        DESCRIPTION. The default is False.
-
-    Returns
-    -------
-    Write .txt files and save them in the selected directories.
-
-    """
-    if list_url:
-        for url in tqdm(list_url):
-            check_url = utils.is_url(url)
-            if not check_url:
-                print(url + " doesn't exist")
-            else:
-                if "daily" in directory_path or "monthly" in directory_path:
-                    # manual case
-                    file_name = url.split('/')[-1]
-                    device = file_name.split("_")[2]
-                else:
-                    # automatic case
-                    date_format = "%Y-%m-%d_%H-%M-%S"
-                    formatted_date = start_date.strftime(date_format)
-                    device = re.split(r'[\-.]+', url)[-2]
-                    file_name = formatted_date + "_donnees_" + device + ".txt"
-
-                # grab the file
-                request.urlretrieve(url, directory_path + "/" + device + "/" + file_name)
-
-
-def is_url(url):
-    """
-    Check if the passed url exists or not
-
-    INPUT:
-    :param: url (str)      url to test
-
-    OUTPUT: True if the url exists, False if not
-    """
-    r = requests.get(url)
-    if r.status_code == 429:
-        print('Retry URL checking (429)')
-        time.sleep(5)
-        return is_url(url)
-    elif r.status_code == 404:
-        return False
-    else:
-        return True
-
-
-@task()
-def show_passed_arguments(passed_arguments_dict: dict):
-    print("Starting show_passed_arguments")
-    print(passed_arguments_dict["start_date"])
-    print(passed_arguments_dict["end_date"])
-    print(passed_arguments_dict["source"])
-    print(passed_arguments_dict["directory_path"])
-    print(passed_arguments_dict["monthly"])
-    print("Finishing show_passed_arguments")
+# def is_url(url):
+#     """
+#     Check if the passed url exists or not
+#
+#     INPUT:
+#     :param: url (str)      url to test
+#
+#     OUTPUT: True if the url exists, False if not
+#     """
+#     r = requests.get(url)
+#     if r.status_code == 429:
+#         print('Retry URL checking (429)')
+#         time.sleep(5)
+#         return is_url(url)
+#     elif r.status_code == 404:
+#         return False
+#     else:
+#         return True

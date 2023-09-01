@@ -26,7 +26,7 @@ def ace_scraping():
     #     print(len(dates_in_time_interval_p))
     #     print("--------------------------")
 
-    measuring_devices = ['mag', 'swepam', 'epam', 'sis']
+
 
     # Get the start and en dates and the directory path
     # Retrieves the current day as start date and One as end date since
@@ -39,9 +39,15 @@ def ace_scraping():
     passed_arguments_dict = \
         au.get_dates_in_time_interval(passed_arguments_dict)
 
-    passed_arguments_dict["measuring_devices"] = measuring_devices
+    # Get the measuring devices
+    passed_arguments_dict = \
+        au.get_measuring_devices(passed_arguments_dict)
 
+    # Get the list of URLs
     passed_arguments_dict = au.define_url_format(passed_arguments_dict)
+
+    # Download the data
+    passed_arguments_dict = au.download_data(passed_arguments_dict)
 
     # Save parameters on local file
     au.save_passed_arguments_locally(passed_arguments_dict)
