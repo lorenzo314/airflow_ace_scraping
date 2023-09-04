@@ -49,6 +49,9 @@ def ace_scraping():
     # Download the data
     passed_arguments_dict = au.download_data(passed_arguments_dict)
 
+    # Upload on cloud
+    au.upload_blob(passed_arguments_dict)
+
     # Save parameters on local file
     au.save_passed_arguments_locally(passed_arguments_dict)
 

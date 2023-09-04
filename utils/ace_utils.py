@@ -17,6 +17,10 @@ import requests
 
 from airflow.decorators import task
 
+# Necessary to do pip install --upgrade google-cloud-storage
+# See https://stackoverflow.com/questions/50840511/google-cloud-import-storage-cannot-import-storage
+from google.cloud import storage
+
 
 @task()
 def initialize_date_and_directory_path():
@@ -360,6 +364,73 @@ def save_passed_arguments_locally(passed_arguments_dict: dict):
                 file.write(f'output file {i}\n')
         else:
             file.write(f'output_files {str(None)}\n')
+
+
+# Copied from
+# spaceable\python-storage\samples\snippets\storage_upload_file.py
+@task()
+def upload_blob(passed_arguments_dict: dict):
+    """Uploads a file to the bucket."""
+    # The ID of your GCS bucket
+    # bucket_name = "your-bucket-name"
+    # The path to your file to upload
+    # source_file_name = "local/path/to/file"
+    # The ID of your GCS object
+    # destination_blob_name = "storage-object-name"
+
+    # BUCKET NAME RANDOMLY GENERATED
+    #
+    # v3mhxhemaey1ohkyil8v
+    #
+    ##################################
+
+    # TODO: fill
+    bucket_name = "v3mhxhemaey1ohkyil8v"
+    # There are several files to upload, one for each instrument
+    output_files = passed_arguments_dict["output_files"]
+
+    print('_______________________________')
+    for i in output_files:
+        print(i)
+    print('_______________________________')
+
+    # TODO; fill
+    # destination_blob_name = .....
+
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    print(type(bucket))
+    for i in output_files:
+        destination_blob_name = i
+        blob = bucket.blob(destination_blob_name)
+
+        generation_match_precondition = 0
+
+        source_file_name = i
+
+        blob.upload_from_filename(
+            source_file_name,
+            if_generation_match=generation_match_precondition
+        )
+
+        print(
+            f"File {source_file_name} uploaded to {destination_blob_name}."
+        )
+
+    # Optional: set a generation-match precondition to avoid potential race conditions
+    # and data corruptions. The request to upload is aborted if the object's
+    # generation number does not match your precondition. For a destination
+    # object that does not yet exist, set the if_generation_match precondition to 0.
+    # If the destination object already exists in your bucket, set instead a
+    # generation-match precondition using its generation number.
+    # generation_match_precondition = 0
+
+    # blob.upload_from_filename(source_file_name, if_generation_match=generation_match_precondition)
+    #
+    # print(
+    #     f"File {source_file_name} uploaded to {destination_blob_name}."
+    # )
+
 
 #############################################################################
 #
