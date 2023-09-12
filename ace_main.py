@@ -12,22 +12,6 @@ import ace_utils as au
     tags=["ace_scraping"]
 )
 def ace_scraping():
-    # @task()
-    # def print_dates(passed_arguments_dict_p: dict):
-    #     print("hello")
-    #     dates_in_time_interval_p = passed_arguments_dict_p["dates_in_time_interval"]
-    #     print("--------------------------")
-    #     for d in dates_in_time_interval_p:
-    #         print(d)
-    #         print(type(d))
-    #         print("--------------------------")
-    #     print("--------------------------")
-    #     print(type(dates_in_time_interval_p))
-    #     print(len(dates_in_time_interval_p))
-    #     print("--------------------------")
-
-
-
     # Get the start and en dates and the directory path
     # Retrieves the current day as start date and One as end date since
     # this is done in automatic mode
@@ -49,8 +33,17 @@ def ace_scraping():
     # Download the data
     passed_arguments_dict = au.download_data(passed_arguments_dict)
 
+    # Get the bucket name
+    passed_arguments_dict = au.get_bucket_name(passed_arguments_dict)
+
     # Upload on cloud
-    au.upload_blob(passed_arguments_dict)
+    passed_arguments_dict = au.upload_raw(passed_arguments_dict)
+
+    passed_arguments_dict = au.aggregate_all_devices(passed_arguments_dict)
+    # aggregate_all_devices(directory_path, measuring_devices)
+
+    # Upload silver data
+    passed_arguments_dict = au.upload_silver(passed_arguments_dict)
 
     # Save parameters on local file
     au.save_passed_arguments_locally(passed_arguments_dict)
