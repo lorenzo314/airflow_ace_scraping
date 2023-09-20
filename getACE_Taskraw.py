@@ -36,11 +36,10 @@ def getACE_taskraw():
     # Get the bucket name
     passed_arguments_dict = aur.get_bucket_name(passed_arguments_dict)
 
-    # Upload on cloud
-    passed_arguments_dict = aur.upload_raw(passed_arguments_dict)
-
     # Save parameters on local file
     passed_arguments_dict = aur.save_passed_arguments_locally(passed_arguments_dict)
 
+    # Upload on cloud
+    passed_arguments_dict = aur.upload_raw(passed_arguments_dict)
 
 getACE_taskraw()
